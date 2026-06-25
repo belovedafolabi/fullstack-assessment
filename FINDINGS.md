@@ -17,6 +17,7 @@
 - **Impact:** Security and data integrity risk. Sequential IDs are not the best and honestly easy to guess, making the system prone to attacks and collision issues during high-concurrency order creation.
 - **Fix:** Migrate identifier columns to UUIDs and update the `POST /orders` and `POST /payments/charge` logic to require unique client-generated identifiers.
 - **Trade-offs:** Requires a schema migration which could be disruptive for existing data if not handled with care. For this specific assessment it wouldn't be an issue though.
+- **Not fixed due to time constraints**
 
 ### Issue: Admin Product Update Server-Side Crash
 - **What:** The `PATCH` endpoint for products returns a 500 Internal Server Error when updated.
@@ -43,6 +44,7 @@
 - **Impact:** Poor UX and this would make the Users feel stuck in a filtered view and cannot easily return to the full product catalog. They would be forced to reload the page to see the full Products listing.
 - **Fix:** Add an `onChange` listener to detect when the search string is empty and trigger a re-fetch or reset of the product list state.
 - **Trade-offs:** Potentially increases the number of API calls if I make the reset trigger a new fetch rather than a local state filter.
+- **Not fixed due to time constraints**
 
 ### Issue: No Auto-Refresh for Payment Status on Admin Dashboard
 - **What:** The admin dashboard does not automatically refresh the payment status of orders and this would definitely cause issues for the Admin in proper processing of orders.
@@ -51,6 +53,7 @@
 - **Impact:** UX degradation which should not be allowed for these types of web apps cause the Admins must manually refresh the entire browser page to see if an order has been paid.
 - **Fix:** Implement a `setInterval` hook to poll the `/orders` endpoint for updates just as how it was done for the `Order Details Page`.
 - **Trade-offs:** Increased load on the backend server due to continuous polling.
+- **Not fixed due to time constraints**
 
 
 ### Issue: "Buy Now" Button Visibility
