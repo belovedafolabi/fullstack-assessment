@@ -7,14 +7,24 @@ async function request<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
+    // init FIRST to catch methods and avoid overwriting them with defaults if set at end
+    ...init,
     headers: {
       "Content-Type": "application/json",
       ...(init.headers || {}),
     },
-    ...init,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // check if the backend passed detailed validation errors
+    if (data?.details) {
+      // convert the error details object into a readable string for alerts for the admin user
+      const errorMessages = Object.entries(data.details)
+        .map(([field, messages]) => `${field}: ${(messages as string[]).join(", ")}`)
+        .join("\n");
+      
+      throw new Error(`${data.error}\n${errorMessages}`);
+    }
     throw new Error(data?.error || res.statusText);
   }
   return data as T;
