@@ -18,6 +18,15 @@ export default function ProductDetailPage() {
       .catch((err) => console.error(err));
   }, [id]);
 
+  // handler to ensure quantity stays within 1 and available stock
+  const handleQuantityChange = (value: number) => {
+    if (!product) return;
+    
+    // Clamp the value between 1 and the available stock
+    const clampedValue = Math.min(Math.max(1, value), product.stock);
+    setQuantity(clampedValue);
+  };
+
   if (!product) return <p>Loading...</p>;
 
   async function buyNow() {
@@ -43,11 +52,15 @@ export default function ProductDetailPage() {
         {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
       </p>
       <div className="qty-row">
+        <label htmlFor="quantity">Quantity:</label>
         <input
+          id="quantity"
           type="number"
           min={1}
+          max={product.stock} // Native HTML max attribute
           value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
+          onChange={(e) => handleQuantityChange(Number(e.target.value))}
+          disabled={product.stock === 0} // Prevent input if out of stock
         />
       </div>
       <div className="actions">

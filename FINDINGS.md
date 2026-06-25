@@ -66,7 +66,7 @@
 
 ### Issue: Stock Validation Failure Before Payment
 - **What:** The system processes payments for orders even if the product inventory has depleted since the order was originally created. This potentially lead to negative stock values in the database.
-- **Where:** Frontend ()`frontend/src/pages/OrderDetailPage.tsx`) and Backend (`backend/src/services/ordersService.js`).
+- **Where:** Frontend (`frontend/src/pages/OrderDetailPage.tsx`) and Backend (`backend/src/services/ordersService.js`).
 - **Why:** The order page does not re-verify the real-time stock levels of the ordered items before allowing the user to initiate the payment. If another concurrent user buys the last available item while the current user is still viewing the order page, the system blindly proceeds with the charge. In production reservation of items for a set duration of time could be implemented but for this assessment I'm going with the current case.
 - **Impact:** Operational failure and poor user experience (overselling). Customers will successfully pay for items that no longer exist, forcing manual refunds and inventory corrections.
 - **Fix:** Implement a pre-payment validation check on the order page to fetch the current product stock. If the stock is insufficient, disable the "Pay Now" button and display an "Out of Stock" alert to the user. Back this up with a strict stock re-verification in the backend `chargeOrder` service immediately before hitting the payment gateway to prevent API bypasses.
