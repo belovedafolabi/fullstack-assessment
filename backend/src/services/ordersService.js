@@ -64,7 +64,7 @@ async function createOrder({ customerId, items, totalAmount }) {
   return order;
 }
 
-async function chargeOrder({ orderId, idempotencyKey }) {
+/* async function chargeOrder({ orderId, idempotencyKey }) {
   if (idempotencyKey) {
     const cached = await redis.get(`idem:${idempotencyKey}`);
     if (cached) {
@@ -110,6 +110,76 @@ async function chargeOrder({ orderId, idempotencyKey }) {
   }
 
   return { order: updatedOrder, payment };
+} */
+
+async function chargeOrder({ orderId, idempotencyKey }) {
+  const redisKey = `idem:${idempotencyKey}`;
+
+  // check existing state (did they already pay, or is it currently processing?)
+  const cached = await redis.get(redisKey);
+  if (cached) {
+    if (cached === 'PROCESSING') {
+      const error = new Error("Payment is currently processing. Please wait.");
+      error.status = 409;
+      throw error;
+    }
+    // If it's not 'PROCESSING', it's a cached successful response. Return it safely.
+    return JSON.parse(cached);
+  }
+
+  // acquire an atomic lock (SET if Not eXists, expires in 60 seconds which is enough time for a payment to process in ideal conditions unless Glo :( )
+  const lockAcquired = await redis.set(redisKey, 'PROCESSING', 'NX', 'EX', 60);
+  if (!lockAcquired) {
+    const error = new Error("Payment is currently processing. Please wait.");
+    error.status = 409;
+    throw error;
+  }
+
+  try {
+    const order = await ordersRepository.getOrderById(orderId);
+    if (!order) {
+      const error = new Error("Order not found");
+      error.status = 404;
+      throw error;
+    }
+
+    if (order.status !== "PENDING") {
+      const error = new Error("Only pending orders can be charged");
+      error.status = 409;
+      throw error;
+    }
+
+    const gatewayResponse = await paymentGateway.charge({
+      orderId: order.id,
+      amount: order.totalAmount,
+    });
+
+    const payment = await paymentsRepository.createPayment({
+      orderId: order.id,
+      amount: gatewayResponse.chargedAmount,
+      providerTxnId: gatewayResponse.providerTxnId,
+      status: "SUCCESS",
+      idempotencyKey,
+    });
+
+    const updatedOrder = await ordersRepository.markOrderAsPaid(order.id);
+
+    const responsePayload = { order: updatedOrder, payment };
+
+    // cache the successful result and overwrite the lock (Expire in 24 hours)
+    await redis.set(
+      redisKey,
+      JSON.stringify(responsePayload),
+      "EX",
+      86400 
+    );
+
+    return responsePayload;
+  } catch (error) {
+    // critical: release the lock if payment failed so the user can retry
+    await redis.del(redisKey);
+    throw error;
+  }
 }
 
 async function processPaymentWebhook({

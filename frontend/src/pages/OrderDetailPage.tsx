@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { chargeOrder, getOrder } from "../api";
 import type { Order } from "../types";
@@ -7,6 +7,8 @@ export default function OrderDetailPage() {
   const { id } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [paying, setPaying] = useState(false);
+  // unique key for this component's lifecycle
+  const idempotencyKeyRef = useRef(crypto.randomUUID());
 
   useEffect(() => {
     if (!id) return;
@@ -21,9 +23,16 @@ export default function OrderDetailPage() {
 
   async function pay() {
     setPaying(true);
-    const result = await chargeOrder(order!.id);
-    setOrder(result.order);
-    setPaying(false);
+    try {
+      // pass the stable key to the API call
+      const result = await chargeOrder(order!.id, idempotencyKeyRef.current);
+      setOrder(result.order);
+    } catch (error) {
+      console.error("Payment request failed or was rejected as a duplicate:", error);
+    } finally {
+      // 3. Ensure the button unlocks even if the backend rejects the duplicate click
+      setPaying(false);
+    }
   }
 
   return (

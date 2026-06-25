@@ -54,9 +54,21 @@ export function getOrder(id: number | string): Promise<Order> {
   return request<Order>(`/orders/${id}`);
 }
 
-export function chargeOrder(orderId: number): Promise<{ order: Order }> {
+/* export function chargeOrder(orderId: number): Promise<{ order: Order }> {
   return request<{ order: Order }>(`/payments/charge`, {
     method: "POST",
+    body: JSON.stringify({ orderId }),
+  });
+} */
+
+// now uses an idempotency key to prevent duplicate charges in case of network issues or retries
+export async function chargeOrder(orderId: number, idempotencyKey: string): Promise<{ order: Order, payment: any }> {
+  return request("/payments/charge", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    },
     body: JSON.stringify({ orderId }),
   });
 }

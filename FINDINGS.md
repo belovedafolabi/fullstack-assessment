@@ -7,7 +7,7 @@
 - **Where:** `backend/src/routes/paymentsRoutes.js`
 - **Why:** The backend does not verify if a transaction has already been initiated or completed for the given order, nor does it enforce the use of an `Idempotency-Key` to ensure there are no duplicate charges. Network faliure is one cause of this and I've encountered this a lot of times personally so it's a major issue whenever payments are involved.
 - **Impact:** Financial risk. Customers can be charged multiple times for the same order.
-- **Fix:** I'm implementing a Redis-based cache to store `Idempotency-Key` values. Before processing a payment, the server would check if the key exists. If it does, it should return the status of the original request instead of re-processing the payment.
+- **Fix:** I'm implementing a Redis-based cache to store `Idempotency-Key` values. Before processing a payment, the server would check if the key exists. If it does, it should return the status of the original request instead of re-processing the payment. I'm making the Idempotency-Key a mandatory header. No key, no payment.
 - **Trade-offs:** Introduces a dependency on Redis availability during the payment flow.
 
 ### Issue: Not using Unique Identifiers (UUIDs)
@@ -17,6 +17,14 @@
 - **Impact:** Security and data integrity risk. Sequential IDs are not the best and honestly easy to guess, making the system prone to attacks and collision issues during high-concurrency order creation.
 - **Fix:** Migrate identifier columns to UUIDs and update the `POST /orders` and `POST /payments/charge` logic to require unique client-generated identifiers.
 - **Trade-offs:** Requires a schema migration which could be disruptive for existing data if not handled with care. For this specific assessment it wouldn't be an issue though.
+
+### Issue: Stock Validation Failure Before Payment
+- **What:** The system processes payments for orders even if the product inventory has depleted since the order was originally created. This leads to negative stock values in the database.
+- **Where:** Frontend (`frontend/src/pages/OrderDetailPage.tsx` or similar) and Backend (`backend/src/services/ordersService.js` inside the charge flow).
+- **Why:** The order page does not re-verify the real-time stock levels of the ordered items before allowing the user to initiate the payment. If another concurrent user buys the last available item while the current user is still viewing the order page, the system blindly proceeds with the charge.
+- **Impact:** Operational failure and poor user experience (overselling). Customers will successfully pay for items that no longer exist, forcing manual refunds and inventory corrections.
+- **Fix:** Implement a pre-payment validation check on the order page to fetch the current product stock. If the stock is insufficient, disable the "Pay Now" button and display an "Out of Stock" alert to the user. Back this up with a strict stock re-verification in the backend `chargeOrder` service immediately before hitting the payment gateway to prevent API bypasses.
+- **Trade-offs:** Introduces an additional API call to fetch real-time product data before executing the checkout, which slightly increases latency upon clicking the payment button.
 
 ### Issue: Admin Product Update Server-Side Crash
 - **What:** The `PATCH` endpoint for products returns a 500 Internal Server Error when updated.
