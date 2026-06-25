@@ -149,6 +149,17 @@ async function chargeOrder({ orderId, idempotencyKey }) {
       throw error;
     }
 
+    // Strict backend stock re-verification
+    const orderDetails = await ordersRepository.getOrderWithDetails(order.id);
+    for (const item of orderDetails.items) {
+      const product = await productsRepository.getProductById(item.productId);
+      if (!product || product.stock < item.quantity) {
+        const error = new Error(`Payment declined: Insufficient stock for ${item.name || 'a product'}.`);
+        error.status = 409;
+        throw error;
+      }
+    }
+
     const gatewayResponse = await paymentGateway.charge({
       orderId: order.id,
       amount: order.totalAmount,
