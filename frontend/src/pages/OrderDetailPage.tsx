@@ -65,8 +65,8 @@ export default function OrderDetailPage() {
       <h1>Order #{order.id}</h1>
       {/* NEW: Notification area */}
       {errorMessage && 
-      <div className="error-notification" style={{ color: 'red', marginBottom: '10px' }}>
-        {errorMessage}
+        <div className="error-notification" style={{ color: 'red', marginBottom: '10px' }}>
+          <strong>Alert:</strong> {errorMessage}
         </div>
       }
       <p>
